@@ -19,38 +19,38 @@ FIXTURE_HTML = """
     <tr>
       <td>A面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="○"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><input type="checkbox"><label>○</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>B面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>C面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>D面兼ゲートボール場</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
   </tbody>
 </table>
@@ -99,38 +99,38 @@ FIXTURE_HTML_MULTI_TABLE = """
     <tr>
       <td>A面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="○"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><input type="checkbox"><label>○</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>B面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>C面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>D面兼ゲートボール場</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
   </tbody>
 </table>
@@ -151,38 +151,38 @@ FIXTURE_HTML_MULTI_TABLE = """
     <tr>
       <td>A面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="○"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><input type="checkbox"><label>○</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>B面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="○"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><input type="checkbox"><label>○</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>C面</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
     <tr>
       <td>D面兼ゲートボール場</td>
       <td>－</td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
-      <td><input type="checkbox" aria-label="×"></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
+      <td><label>×</label></td>
     </tr>
   </tbody>
 </table>

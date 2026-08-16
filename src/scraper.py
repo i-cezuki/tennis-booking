@@ -41,11 +41,17 @@ def extract_date_tables(page) -> dict:
             if court_name not in COURTS:
                 continue
 
-            checkboxes = row.get_by_role("checkbox").all()
+            # Slot cells render their symbol as visible cell text in both
+            # states the live site uses: read-only cells are plain
+            # <td><label>×</label></td> with no <input>, and interactive
+            # cells are <td><input type="checkbox">...<label>○</label></td>.
+            # Neither carries the symbol in an aria-label attribute, so read
+            # each slot cell's own text directly instead of going through
+            # checkbox roles/attributes.
+            slot_cells = cells[2:]
             slot_values = {}
-            for slot_label, checkbox in zip(slot_labels, checkboxes):
-                symbol = checkbox.get_attribute("aria-label")
-                slot_values[slot_label] = symbol
+            for slot_label, slot_cell in zip(slot_labels, slot_cells):
+                slot_values[slot_label] = slot_cell.inner_text().strip()
             day_data[court_name] = slot_values
 
         result[iso_date] = day_data
