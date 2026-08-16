@@ -1,11 +1,15 @@
 from playwright.sync_api import sync_playwright
 from src.scraper import extract_date_tables, SLOTS
 
-# Header slot cells replicate the live site's actual markup: the time range
-# is split across a child <span> (introducing whitespace/newlines around it
-# when read via inner_text()) and uses U+FF5E FULLWIDTH TILDE ("～") rather
-# than the U+301C WAVE DASH ("〜") that SLOTS uses. Both quirks must be
-# normalized by extract_date_tables for slot_labels to match SLOTS exactly.
+# Header slot cells replicate the two live-site quirks that corrupt naively
+# extracted slot labels: (1) the time range renders across rendered line
+# breaks around the dash (plain inline <span> with no CSS does NOT insert
+# newlines into Chromium's inner_text() -- the <br> tags here are what
+# actually reproduce the real embedded-newline symptom, verified by
+# confirming the pre-fix code fails against this fixture, see fix report 3),
+# and (2) the dash itself is U+FF5E FULLWIDTH TILDE ("～"), not the
+# U+301C WAVE DASH ("〜") that SLOTS uses. Both quirks must be normalized by
+# extract_date_tables for slot_labels to match SLOTS exactly.
 FIXTURE_HTML = """
 <html><body>
 <table>
@@ -13,11 +17,11 @@ FIXTURE_HTML = """
     <tr>
       <th>2026年8月22日(土)</th>
       <th>定員</th>
-      <th>9:00<span>～</span>11:00</th>
-      <th>11:00<span>～</span>13:00</th>
-      <th>13:00<span>～</span>15:00</th>
-      <th>15:00<span>～</span>17:00</th>
-      <th>17:00<span>～</span>18:00</th>
+      <th>9:00<br><span>～</span><br>11:00</th>
+      <th>11:00<br><span>～</span><br>13:00</th>
+      <th>13:00<br><span>～</span><br>15:00</th>
+      <th>15:00<br><span>～</span><br>17:00</th>
+      <th>17:00<br><span>～</span><br>18:00</th>
     </tr>
   </thead>
   <tbody>
@@ -101,11 +105,11 @@ FIXTURE_HTML_MULTI_TABLE = """
     <tr>
       <th>2026年8月22日(土)</th>
       <th>定員</th>
-      <th>9:00<span>～</span>11:00</th>
-      <th>11:00<span>～</span>13:00</th>
-      <th>13:00<span>～</span>15:00</th>
-      <th>15:00<span>～</span>17:00</th>
-      <th>17:00<span>～</span>18:00</th>
+      <th>9:00<br><span>～</span><br>11:00</th>
+      <th>11:00<br><span>～</span><br>13:00</th>
+      <th>13:00<br><span>～</span><br>15:00</th>
+      <th>15:00<br><span>～</span><br>17:00</th>
+      <th>17:00<br><span>～</span><br>18:00</th>
     </tr>
   </thead>
   <tbody>
@@ -153,11 +157,11 @@ FIXTURE_HTML_MULTI_TABLE = """
     <tr>
       <th>2026年8月23日(日)</th>
       <th>定員</th>
-      <th>9:00<span>～</span>11:00</th>
-      <th>11:00<span>～</span>13:00</th>
-      <th>13:00<span>～</span>15:00</th>
-      <th>15:00<span>～</span>17:00</th>
-      <th>17:00<span>～</span>18:00</th>
+      <th>9:00<br><span>～</span><br>11:00</th>
+      <th>11:00<br><span>～</span><br>13:00</th>
+      <th>13:00<br><span>～</span><br>15:00</th>
+      <th>15:00<br><span>～</span><br>17:00</th>
+      <th>17:00<br><span>～</span><br>18:00</th>
     </tr>
   </thead>
   <tbody>
