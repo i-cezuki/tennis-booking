@@ -1,5 +1,8 @@
+from datetime import date
+
+import pytest
 from playwright.sync_api import sync_playwright
-from src.scraper import extract_date_tables, SLOTS
+from src.scraper import extract_date_tables, validate_extraction_result, SLOTS
 
 # Header slot cells replicate the two live-site quirks that corrupt naively
 # extracted slot labels: (1) the time range renders across rendered line
@@ -241,3 +244,29 @@ def test_extract_date_tables_parses_multiple_tables():
             for label in court_slots:
                 assert "\n" not in label and " " not in label
                 assert "～" not in label
+
+
+def test_validate_extraction_result_raises_on_empty_result():
+    # Simulates navigation silently landing on an unexpected page: no
+    # tables found, extract_date_tables returns {}. This must raise
+    # rather than let main() overwrite state.json with an empty snapshot.
+    with pytest.raises(RuntimeError):
+        validate_extraction_result({}, [date(2026, 8, 22), date(2026, 8, 23)])
+
+
+def test_validate_extraction_result_raises_on_partial_result():
+    # Simulates only some of the requested date tables being found (e.g.
+    # a partial layout change) -- still a fail-loud condition.
+    with pytest.raises(RuntimeError):
+        validate_extraction_result(
+            {"2026-08-22": {}}, [date(2026, 8, 22), date(2026, 8, 23)]
+        )
+
+
+def test_validate_extraction_result_passes_when_all_dates_present():
+    # No exception when every requested date has an entry, regardless of
+    # the per-date contents (that's extract_date_tables's concern).
+    validate_extraction_result(
+        {"2026-08-22": {}, "2026-08-23": {}},
+        [date(2026, 8, 22), date(2026, 8, 23)],
+    )

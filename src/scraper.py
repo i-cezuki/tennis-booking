@@ -117,6 +117,28 @@ def navigate_to_availability_page(page, target_dates: list[date]) -> None:
         page.get_by_role("link", name="次へ進む").click()
 
 
+def validate_extraction_result(result: dict, target_dates: list[date]) -> None:
+    """Raise if `result` (as returned by extract_date_tables) is missing an
+    entry for any date in `target_dates`.
+
+    An empty or incomplete result means navigation silently landed on an
+    unexpected page (e.g. a session/ViewState hiccup or a site layout
+    change the selectors missed) without raising. Per the spec's error
+    handling contract, such site-structure drift must raise and exit 1,
+    not be swallowed into an empty snapshot that would overwrite the
+    committed state.json baseline and cause a silent monitoring blackout.
+    """
+    expected = {d.isoformat() for d in target_dates}
+    actual = set(result.keys())
+    if expected != actual:
+        missing = expected - actual
+        raise RuntimeError(
+            "extract_date_tables returned an incomplete result "
+            f"(missing dates: {sorted(missing)}); likely a site layout "
+            "change or navigation failure -- refusing to overwrite state.json"
+        )
+
+
 def fetch_availability(target_dates: list[date]) -> dict:
     """Launch headless Chromium, navigate, extract, and return the combined
     availability snapshot for `target_dates`.
@@ -128,6 +150,8 @@ def fetch_availability(target_dates: list[date]) -> dict:
         page = browser.new_page()
         try:
             navigate_to_availability_page(page, target_dates)
-            return extract_date_tables(page)
+            result = extract_date_tables(page)
+            validate_extraction_result(result, target_dates)
+            return result
         finally:
             browser.close()
