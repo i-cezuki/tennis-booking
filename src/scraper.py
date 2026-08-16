@@ -25,7 +25,15 @@ def extract_date_tables(page) -> dict:
 
         date_text = header_cells[0].inner_text().strip()
         iso_date = parse_japanese_date(date_text).isoformat()
-        slot_labels = [cell.inner_text().strip() for cell in header_cells[2:]]
+        # Each slot header's text is split across child <span> elements
+        # (e.g. "9:00<span>～</span>11:00"), so a plain .strip() leaves
+        # embedded whitespace/newlines between the pieces. Collapse all
+        # whitespace with no separator to rejoin them, then convert the
+        # live site's fullwidth tilde (U+FF5E "～") to the canonical wave
+        # dash (U+301C "〜") that SLOTS uses -- these look alike but are
+        # different code points, and NFKC does not map one to the other.
+        raw_labels = [cell.inner_text() for cell in header_cells[2:]]
+        slot_labels = ["".join(label.split()).replace("～", "〜") for label in raw_labels]
 
         rows = table.get_by_role("row").all()
         day_data = {}
