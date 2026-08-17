@@ -161,6 +161,11 @@ def fetch_availability(target_dates: list[date]) -> dict:
         except Exception:
             import sys
             print(f"[error] fetch_availability failed at page.url = {page.url}", file=sys.stderr)
+            try:
+                page.screenshot(path="failure.png", full_page=True)
+                print("[debug] saved screenshot to failure.png", file=sys.stderr)
+            except Exception as screenshot_error:
+                print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
             raise
         finally:
             browser.close()
