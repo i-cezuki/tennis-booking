@@ -16,10 +16,18 @@ def extract_date_tables(page) -> dict:
     {iso_date: {court: {slot: symbol}}}.
     """
     result = {}
-    tables = page.get_by_role("table").all()
+    # Structural table traversal uses raw tag locators (table/tr/th/td), not
+    # ARIA roles (table/row/columnheader/cell): role="columnheader" inference
+    # for a <th> with no explicit scope depends on table-structure heuristics
+    # that proved unreliable in GitHub Actions' headless environment (it
+    # either lagged behind DOM attachment or never resolved), even though the
+    # exact same page rendered correctly (confirmed via screenshot). Tag
+    # locators query the DOM directly and don't depend on that computation.
+    tables = page.locator("table").all()
 
     for table in tables:
-        header_cells = table.get_by_role("columnheader").all()
+        rows = table.locator("tr").all()
+        header_cells = rows[0].locator("th, td").all() if rows else []
         if not header_cells:
             continue
 
@@ -35,10 +43,9 @@ def extract_date_tables(page) -> dict:
         raw_labels = [cell.inner_text() for cell in header_cells[2:]]
         slot_labels = ["".join(label.split()).replace("～", "〜") for label in raw_labels]
 
-        rows = table.get_by_role("row").all()
         day_data = {}
         for row in rows[1:]:  # skip header row
-            cells = row.get_by_role("cell").all()
+            cells = row.locator("th, td").all()
             if not cells:
                 continue
             # The live site renders court names with full-width Latin
