@@ -79,32 +79,30 @@ def navigate_to_availability_page(page, target_dates: list[date]) -> None:
 
     # 施設別空き状況: show a 2-week window starting today so all target
     # dates are visible in one grid. Clicking 表示 triggers an in-place
-    # AJAX refresh (no URL change) that briefly detaches the table, so wait
-    # for it to reattach before reading columns -- get_by_role(...).all()
-    # snapshots the DOM immediately and does not auto-wait like a locator
-    # action does.
+    # AJAX refresh (no URL change) that briefly detaches the table. Waiting
+    # for just the <table> element to attach is not enough: Chromium's
+    # accessibility tree (which get_by_role queries against) can lag a
+    # render frame or more behind the raw DOM after a large AJAX-driven
+    # replacement, so column headers can still report zero results even
+    # though row content already resolves. Wait for a specific, always-present
+    # columnheader ("定員") instead -- that forces the wait to hold until the
+    # accessibility tree itself has caught up with the new header row, not
+    # just until some <table> exists in the DOM.
     page.get_by_role("radio", name="2週間").check()
     page.get_by_role("button", name="表示").click()
-    page.get_by_role("table").first.wait_for()
+    page.get_by_role("columnheader", name="定員").first.wait_for()
 
     header_cells = page.get_by_role("columnheader").all()
     target_days = {d.day for d in target_dates}
-    import sys
-    print(f"[debug] target_days: {target_days}", file=sys.stderr)
-    print(f"[debug] header_cells count: {len(header_cells)}", file=sys.stderr)
-    for i, cell in enumerate(header_cells):
-        print(f"[debug] header_cells[{i}] inner_text: {cell.inner_text()!r}", file=sys.stderr)
     matching_columns = [
         i for i, cell in enumerate(header_cells)
         if any(str(day) == cell.inner_text().strip().split()[0] for day in target_days)
     ]
-    print(f"[debug] matching_columns: {matching_columns}", file=sys.stderr)
 
     court_row = page.get_by_role("row").filter(
         has=page.get_by_role("cell", name=COURT_ROW_NAME)
     )
     row_cells = court_row.get_by_role("cell").all()
-    print(f"[debug] row_cells count: {len(row_cells)}", file=sys.stderr)
     for col_index in matching_columns:
         checkbox = row_cells[col_index].get_by_role("checkbox")
         if checkbox.count() > 0:
@@ -162,9 +160,7 @@ def fetch_availability(target_dates: list[date]) -> dict:
             return result
         except Exception:
             import sys
-            print(f"[debug] page.url() at failure: {page.url}", file=sys.stderr)
-            print(f"[debug] page.title() at failure: {page.title()}", file=sys.stderr)
-            print(f"[debug] page.content() (first 3000 chars):\n{page.content()[:3000]}", file=sys.stderr)
+            print(f"[error] fetch_availability failed at page.url = {page.url}", file=sys.stderr)
             raise
         finally:
             browser.close()
