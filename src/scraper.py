@@ -153,5 +153,11 @@ def fetch_availability(target_dates: list[date]) -> dict:
             result = extract_date_tables(page)
             validate_extraction_result(result, target_dates)
             return result
+        except Exception:
+            import sys
+            print(f"[debug] page.url() at failure: {page.url}", file=sys.stderr)
+            print(f"[debug] page.title() at failure: {page.title()}", file=sys.stderr)
+            print(f"[debug] page.content() (first 3000 chars):\n{page.content()[:3000]}", file=sys.stderr)
+            raise
         finally:
             browser.close()
