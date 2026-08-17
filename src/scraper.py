@@ -79,20 +79,24 @@ def navigate_to_availability_page(page, target_dates: list[date]) -> None:
 
     # 施設別空き状況: show a 2-week window starting today so all target
     # dates are visible in one grid. Clicking 表示 triggers an in-place
-    # AJAX refresh (no URL change) that briefly detaches the table. Waiting
-    # for just the <table> element to attach is not enough: Chromium's
-    # accessibility tree (which get_by_role queries against) can lag a
-    # render frame or more behind the raw DOM after a large AJAX-driven
-    # replacement, so column headers can still report zero results even
-    # though row content already resolves. Wait for a specific, always-present
-    # columnheader ("定員") instead -- that forces the wait to hold until the
-    # accessibility tree itself has caught up with the new header row, not
-    # just until some <table> exists in the DOM.
+    # AJAX refresh (no URL change) that briefly detaches the table.
+    #
+    # Header cells are read via raw tag locators (`th, td` on the first
+    # <tr>), not role="columnheader": Chromium infers columnheader/rowheader
+    # for a <th> without an explicit scope attribute from table-structure
+    # heuristics, and that inference proved unreliable in the GitHub Actions
+    # headless environment -- it either lagged well behind DOM attachment or
+    # never resolved at all, while role="cell" (unambiguous for <td>, used
+    # below for the data rows) was consistently reliable. Tag-based locators
+    # query the DOM directly and sidestep that accessibility-tree computation
+    # entirely.
     page.get_by_role("radio", name="2週間").check()
     page.get_by_role("button", name="表示").click()
-    page.get_by_role("columnheader", name="定員").first.wait_for()
 
-    header_cells = page.get_by_role("columnheader").all()
+    table = page.locator("table").first
+    header_row = table.locator("tr").first
+    header_row.locator("th, td").first.wait_for()
+    header_cells = header_row.locator("th, td").all()
     target_days = {d.day for d in target_dates}
     matching_columns = [
         i for i, cell in enumerate(header_cells)
