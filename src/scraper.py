@@ -89,15 +89,22 @@ def navigate_to_availability_page(page, target_dates: list[date]) -> None:
 
     header_cells = page.get_by_role("columnheader").all()
     target_days = {d.day for d in target_dates}
+    import sys
+    print(f"[debug] target_days: {target_days}", file=sys.stderr)
+    print(f"[debug] header_cells count: {len(header_cells)}", file=sys.stderr)
+    for i, cell in enumerate(header_cells):
+        print(f"[debug] header_cells[{i}] inner_text: {cell.inner_text()!r}", file=sys.stderr)
     matching_columns = [
         i for i, cell in enumerate(header_cells)
         if any(str(day) == cell.inner_text().strip().split()[0] for day in target_days)
     ]
+    print(f"[debug] matching_columns: {matching_columns}", file=sys.stderr)
 
     court_row = page.get_by_role("row").filter(
         has=page.get_by_role("cell", name=COURT_ROW_NAME)
     )
     row_cells = court_row.get_by_role("cell").all()
+    print(f"[debug] row_cells count: {len(row_cells)}", file=sys.stderr)
     for col_index in matching_columns:
         checkbox = row_cells[col_index].get_by_role("checkbox")
         if checkbox.count() > 0:
