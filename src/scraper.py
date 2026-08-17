@@ -16,10 +16,18 @@ def extract_date_tables(page) -> dict:
     {iso_date: {court: {slot: symbol}}}.
     """
     result = {}
-    tables = page.get_by_role("table").all()
+    # Structural table traversal uses raw tag locators (table/tr/th/td), not
+    # ARIA roles (table/row/columnheader/cell): role="columnheader" inference
+    # for a <th> with no explicit scope depends on table-structure heuristics
+    # that proved unreliable in GitHub Actions' headless environment (it
+    # either lagged behind DOM attachment or never resolved), even though the
+    # exact same page rendered correctly (confirmed via screenshot). Tag
+    # locators query the DOM directly and don't depend on that computation.
+    tables = page.locator("table").all()
 
     for table in tables:
-        header_cells = table.get_by_role("columnheader").all()
+        rows = table.locator("tr").all()
+        header_cells = rows[0].locator("th, td").all() if rows else []
         if not header_cells:
             continue
 
@@ -35,10 +43,9 @@ def extract_date_tables(page) -> dict:
         raw_labels = [cell.inner_text() for cell in header_cells[2:]]
         slot_labels = ["".join(label.split()).replace("～", "〜") for label in raw_labels]
 
-        rows = table.get_by_role("row").all()
         day_data = {}
         for row in rows[1:]:  # skip header row
-            cells = row.get_by_role("cell").all()
+            cells = row.locator("th, td").all()
             if not cells:
                 continue
             # The live site renders court names with full-width Latin
@@ -79,15 +86,24 @@ def navigate_to_availability_page(page, target_dates: list[date]) -> None:
 
     # 施設別空き状況: show a 2-week window starting today so all target
     # dates are visible in one grid. Clicking 表示 triggers an in-place
-    # AJAX refresh (no URL change) that briefly detaches the table, so wait
-    # for it to reattach before reading columns -- get_by_role(...).all()
-    # snapshots the DOM immediately and does not auto-wait like a locator
-    # action does.
+    # AJAX refresh (no URL change) that briefly detaches the table.
+    #
+    # Header cells are read via raw tag locators (`th, td` on the first
+    # <tr>), not role="columnheader": Chromium infers columnheader/rowheader
+    # for a <th> without an explicit scope attribute from table-structure
+    # heuristics, and that inference proved unreliable in the GitHub Actions
+    # headless environment -- it either lagged well behind DOM attachment or
+    # never resolved at all, while role="cell" (unambiguous for <td>, used
+    # below for the data rows) was consistently reliable. Tag-based locators
+    # query the DOM directly and sidestep that accessibility-tree computation
+    # entirely.
     page.get_by_role("radio", name="2週間").check()
     page.get_by_role("button", name="表示").click()
-    page.get_by_role("table").first.wait_for()
 
-    header_cells = page.get_by_role("columnheader").all()
+    table = page.locator("table").first
+    header_row = table.locator("tr").first
+    header_row.locator("th, td").first.wait_for()
+    header_cells = header_row.locator("th, td").all()
     target_days = {d.day for d in target_dates}
     matching_columns = [
         i for i, cell in enumerate(header_cells)
@@ -153,5 +169,14 @@ def fetch_availability(target_dates: list[date]) -> dict:
             result = extract_date_tables(page)
             validate_extraction_result(result, target_dates)
             return result
+        except Exception:
+            import sys
+            print(f"[error] fetch_availability failed at page.url = {page.url}", file=sys.stderr)
+            try:
+                page.screenshot(path="failure.png", full_page=True)
+                print("[debug] saved screenshot to failure.png", file=sys.stderr)
+            except Exception as screenshot_error:
+                print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
+            raise
         finally:
             browser.close()

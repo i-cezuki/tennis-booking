@@ -28,6 +28,14 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python -m src.main
 
+      - name: Upload failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshot
+          path: failure.png
+          if-no-files-found: ignore
+
       - name: Commit state.json if changed
         run: |
           if ! git diff --quiet -- state.json; then
