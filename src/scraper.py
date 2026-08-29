@@ -162,7 +162,12 @@ def fetch_availability(target_dates: list[date]) -> dict:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        # AWS Lambda's container has no GPU device and restricted sandboxing;
+        # without these flags Chromium's GPU process fails to launch and the
+        # browser self-terminates ("GPU process isn't usable. Goodbye.").
+        browser = p.chromium.launch(
+            args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"]
+        )
         page = browser.new_page()
         try:
             navigate_to_availability_page(page, target_dates)
