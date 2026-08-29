@@ -57,11 +57,10 @@ resource "aws_iam_role_policy" "scheduler_invoke" {
 resource "aws_scheduler_schedule" "watcher" {
   name       = "${var.project_name}-schedule"
   group_name = "default"
-  # Created disabled: Task 7 verifies the Lambda via manual `aws lambda
-  # invoke` first. Task 8 flips this to ENABLED at the same time the old
-  # GitHub Actions cron is removed, so the two triggers never run in
-  # parallel and never double-notify Discord for the same opening.
-  state = "DISABLED"
+  # Enabled in Task 8, at the same time the old GitHub Actions cron
+  # trigger was removed, so the two triggers never ran in parallel and
+  # never double-notified Discord for the same opening.
+  state = "ENABLED"
 
   flexible_time_window {
     mode = "OFF"
