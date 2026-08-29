@@ -17,10 +17,26 @@ def main() -> None:
     target_dates = weekend_dates_in_range(date.today(), 14)
     new_state = fetch_availability(target_dates)
 
+    total_slots = sum(len(slots) for courts in new_state.values() for slots in courts.values())
+    open_slots = sum(
+        1
+        for courts in new_state.values()
+        for slots in courts.values()
+        for symbol in slots.values()
+        if symbol == "○"
+    )
+    print(
+        f"[info] fetched {len(new_state)} dates, {total_slots} slots, "
+        f"{open_slots} open"
+    )
+
     openings = find_new_openings(old_state, new_state)
+    print(f"[info] {len(openings)} new opening(s)")
     if openings:
         message = build_message(openings)
         send_discord_notification(webhook_url, message)
+
+    print(f"[info] state {'changed' if new_state != old_state else 'unchanged'}")
 
     save_state(state_path, new_state)
 
