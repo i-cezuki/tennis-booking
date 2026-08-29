@@ -13,3 +13,11 @@ output "github_deploy_role_arn" {
 output "aws_account_id" {
   value = data.aws_caller_identity.current.account_id
 }
+
+output "lambda_function_name" {
+  value = aws_lambda_function.watcher.function_name
+}
+
+output "schedule_name" {
+  value = aws_scheduler_schedule.watcher.name
+}
