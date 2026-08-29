@@ -1,9 +1,8 @@
 import os
-from datetime import date
 
 import boto3
 
-from src.dates import weekend_dates_in_range
+from src.dates import weekend_dates_in_range, today_jst
 from src.state import load_state, save_state, load_state_s3, save_state_s3
 from src.diff import find_new_openings
 from src.notify import build_message, send_discord_notification
@@ -51,7 +50,7 @@ def main() -> None:
     webhook_url = _get_webhook_url()
     old_state = _load_state()
 
-    target_dates = weekend_dates_in_range(date.today(), 14)
+    target_dates = weekend_dates_in_range(today_jst(), 14)
     try:
         new_state = fetch_availability(target_dates)
     except Exception:

@@ -1,5 +1,6 @@
-from datetime import date
-from src.dates import weekend_dates_in_range, parse_japanese_date
+from datetime import date, datetime, timezone
+from src import dates as dates_module
+from src.dates import weekend_dates_in_range, parse_japanese_date, today_jst
 
 
 def test_weekend_dates_in_range_includes_only_sat_sun():
@@ -44,3 +45,18 @@ def test_parse_japanese_date_basic():
 
 def test_parse_japanese_date_single_digit_month_day():
     assert parse_japanese_date("2026年9月6日(日)") == date(2026, 9, 6)
+
+
+def test_today_jst_uses_tokyo_date_not_utc_date(monkeypatch):
+    # 2026-08-29 23:47 UTC is already 2026-08-30 08:47 JST: a UTC-based
+    # "today" would be a full calendar day behind the site's actual today.
+    utc_now = datetime(2026, 8, 29, 23, 47, tzinfo=timezone.utc)
+
+    class FakeDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return utc_now.astimezone(tz) if tz else utc_now
+
+    monkeypatch.setattr(dates_module, "datetime", FakeDateTime)
+
+    assert today_jst() == date(2026, 8, 30)
