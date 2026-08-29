@@ -162,22 +162,21 @@ def fetch_availability(target_dates: list[date]) -> dict:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        # AWS Lambda's Firecracker sandbox blocks the GPU helper subprocess
-        # from being spawned at all (Chromium logs "GPU process launch
-        # failed: error_code=1002" -- a process-launch failure, not a
-        # graphics-capability one), even with --disable-gpu, which doesn't
-        # fully stop Chromium from attempting to spawn that process in old
-        # headless mode. --in-process-gpu runs GPU work inside the main
-        # browser process instead of spawning a separate one, avoiding the
-        # subprocess-spawn path that Lambda's sandbox rejects. (Note:
-        # --single-process is NOT used here -- Playwright silently strips it
-        # since it conflicts with Playwright's CDP multi-process model.)
+        # AWS Lambda does not officially support Chromium's normal
+        # multi-process model; this is the documented working flag set for
+        # running Chromium inside Lambda (see microsoft/playwright#14023 and
+        # https://blog.carlosnunez.me/post/scraping-chromium-lambda-nodeless-zerostress/).
+        # --single-process is the flag that actually fixes the "GPU process
+        # isn't usable. Goodbye." crash; --enable-features=...InProcess keeps
+        # the network service in the same process too.
         browser = p.chromium.launch(
             args=[
-                "--disable-gpu",
+                "--headless",
+                "--enable-features=NetworkService,NetworkServiceInProcess",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--in-process-gpu",
+                "--disable-gpu",
+                "--single-process",
             ]
         )
         page = browser.new_page()

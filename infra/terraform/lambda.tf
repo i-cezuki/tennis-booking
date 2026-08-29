@@ -9,7 +9,7 @@ resource "aws_lambda_function" "watcher" {
   package_type  = "Image"
   image_uri     = "${aws_ecr_repository.watcher.repository_url}:latest"
   timeout       = 60
-  memory_size   = 1024
+  memory_size   = 2048
 
   ephemeral_storage {
     size = 1024
