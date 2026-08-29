@@ -10,12 +10,6 @@ variable "project_name" {
   default     = "meguro-tennis-watcher"
 }
 
-variable "github_repo" {
-  description = "GitHub repo allowed to assume the deploy role, as owner/repo"
-  type        = string
-  default     = "i-cezuki/tennis-booking"
-}
-
 variable "discord_webhook_url" {
   description = "Discord webhook URL, stored in SSM as SecureString. Set via TF_VAR_discord_webhook_url env var, never commit it."
   type        = string

@@ -119,6 +119,35 @@ tennis-booking/
    cron実行を停止する（`workflow_dispatch`は手動デバッグ用に残す）
 6. 旧cronと新Lambdaを並行稼働させず、切替と同時に旧cronを止める（二重通知を避けるため）
 
+## 実装で判明した事項（教訓）
+
+実装・検証（Task 7）で当初の想定と異なることが複数判明した。将来のメンテナンスで
+「不要な変更に見えて実は必須」の設定を誤って戻さないよう記録する。
+
+- **`src/scraper.py`は当初「変更しない」としていたが、Chromiumの起動引数のみ変更した**
+  (`p.chromium.launch()`の`args=[...]`)。AWS LambdaのFirecrackerサンドボックスは
+  Chromiumの通常のマルチプロセスモデルを正式にサポートしておらず、以下の完全なフラグ
+  セットが必要:
+  `--headless`, `--enable-features=NetworkService,NetworkServiceInProcess`,
+  `--no-sandbox`, `--disable-dev-shm-usage`, `--disable-gpu`, `--single-process`。
+  特に`--single-process`が無いと`GPU process isn't usable. Goodbye.`で確実にクラッシュする
+  (参考: [microsoft/playwright#14023](https://github.com/microsoft/playwright/issues/14023))。
+  スクレイピング・パースロジック自体は無変更のまま。
+- **Lambdaのメモリは1024MBでは不安定、2048MB以上が必要**。Lambdaはメモリ量に比例して
+  CPU割り当てが決まるため、メモリ不足はChromium起動時のタイミング依存のクラッシュ
+  (`TargetClosedError`)として現れる。2048MBで実測7/8回成功、安定稼働を確認。
+- **GitHub ActionsのOIDCトークンの`sub`クレームは`repo:org/repo:ref:...`ではなく
+  `repo:org@<id>/repo@<id>:ref:...`形式**（org・repoそれぞれに不変の数値IDが付与される）。
+  IAMロールの信頼ポリシーは`StringLike`でワイルドカードを使い
+  (`repo:i-cezuki@*/tennis-booking@*:ref:refs/heads/main`)、この形式を許容する必要がある。
+  古典的な`org/repo`形式を前提にすると認証が常に失敗する。
+- **`token.actions.githubusercontent.com`のOIDCプロバイダーはAWSアカウント内でURLごとに
+  1つしか作成できない**。このAWSアカウントには既に別プロジェクトが作成済みのプロバイダーが
+  存在したため、`resource "aws_iam_openid_connect_provider"`ではなく
+  `data "aws_iam_openid_connect_provider"`で既存のものを参照する構成にした。
+  アクセス制御自体はIAMロールの信頼ポリシーの`Condition`（org/repo/branch指定）で
+  行われるため、プロバイダーリソースを自分で所有していなくても安全。
+
 ## スコープ外（本移行では対応しない）
 
 - `diff.py`のローリングウィンドウ誤検知バグの修正（別タスク）

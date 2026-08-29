@@ -71,5 +71,10 @@ resource "aws_scheduler_schedule" "watcher" {
   target {
     arn      = aws_lambda_function.watcher.arn
     role_arn = aws_iam_role.scheduler_invoke.arn
+
+    retry_policy {
+      maximum_event_age_in_seconds = 60
+      maximum_retry_attempts       = 0
+    }
   }
 }

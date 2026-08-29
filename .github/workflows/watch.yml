@@ -1,3 +1,10 @@
+# Manual debug-only workflow. Production monitoring runs on AWS Lambda +
+# EventBridge Scheduler (see docs/superpowers/specs/2026-08-29-lambda-migration-design.md)
+# using state stored in S3, not the state.json file in this repo. This
+# workflow's state.json is a frozen snapshot from before that cutover and is
+# NOT kept in sync with production -- running this manually may re-notify
+# Discord for openings the Lambda already reported, since it diffs against
+# this stale baseline. It no longer commits state.json back to the repo.
 name: Watch Komaba tennis court availability
 
 on:
@@ -33,15 +40,3 @@ jobs:
           name: failure-screenshot
           path: failure.png
           if-no-files-found: ignore
-
-      - name: Commit state.json if changed
-        run: |
-          if ! git diff --quiet -- state.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add state.json
-            git commit -m "chore: update availability state"
-            git push
-          else
-            echo "No state change, skipping commit."
-          fi
