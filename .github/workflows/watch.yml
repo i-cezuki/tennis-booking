@@ -1,8 +1,6 @@
 name: Watch Komaba tennis court availability
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 permissions:
