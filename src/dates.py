@@ -1,9 +1,11 @@
 import re
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, datetime, timedelta, timezone
 
 _JP_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日")
-_JST = ZoneInfo("Asia/Tokyo")
+# Fixed UTC+9 offset rather than zoneinfo.ZoneInfo("Asia/Tokyo"): Japan
+# observes no DST so the offset never changes, and the Lambda base image
+# has no IANA tzdata installed (ZoneInfo raises ZoneInfoNotFoundError there).
+_JST = timezone(timedelta(hours=9))
 
 
 def today_jst() -> date:
