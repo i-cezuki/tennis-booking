@@ -11,6 +11,10 @@ resource "aws_lambda_function" "watcher" {
   timeout       = 60
   memory_size   = 1024
 
+  ephemeral_storage {
+    size = 1024
+  }
+
   environment {
     variables = {
       STATE_BACKEND             = "s3"

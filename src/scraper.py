@@ -162,11 +162,20 @@ def fetch_availability(target_dates: list[date]) -> dict:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        # AWS Lambda's container has no GPU device and restricted sandboxing;
-        # without these flags Chromium's GPU process fails to launch and the
-        # browser self-terminates ("GPU process isn't usable. Goodbye.").
+        # AWS Lambda's Firecracker sandbox restricts process forking more
+        # than a normal container (this image runs fine outside Lambda, e.g.
+        # under the local RIE smoke test). Without these flags Chromium's
+        # GPU process fails to launch ("GPU process isn't usable. Goodbye.")
+        # and its multi-process zygote forking crashes the driver connection
+        # (Node.js TargetClosedError) even with GPU disabled; --single-process
+        # avoids the subprocess forking Lambda's sandbox won't allow.
         browser = p.chromium.launch(
-            args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"]
+            args=[
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--single-process",
+            ]
         )
         page = browser.new_page()
         try:
