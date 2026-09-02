@@ -1,3 +1,4 @@
+import tempfile
 import unicodedata
 from datetime import date
 
@@ -161,7 +162,9 @@ def fetch_availability(target_dates: list[date]) -> dict:
     """
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as p:
+    with sync_playwright() as p, tempfile.TemporaryDirectory(
+        prefix="chromium-profile-"
+    ) as user_data_dir:
         # AWS Lambda does not officially support Chromium's normal
         # multi-process model; this is the documented working flag set for
         # running Chromium inside Lambda (see microsoft/playwright#14023 and
@@ -169,7 +172,19 @@ def fetch_availability(target_dates: list[date]) -> dict:
         # --single-process is the flag that actually fixes the "GPU process
         # isn't usable. Goodbye." crash; --enable-features=...InProcess keeps
         # the network service in the same process too.
-        browser = p.chromium.launch(
+        #
+        # user_data_dir must be a fresh directory per launch: Lambda reuses
+        # "warm" execution environments (and /tmp persists across
+        # invocations within one), so without this every launch shares
+        # Chromium's default profile dir. If one run's Chromium doesn't
+        # exit cleanly it leaves a stale SingletonLock there, and every
+        # later invocation reusing that same container then fails with
+        # "Failed to create a ProcessSingleton" / "Failed to create socket
+        # directory" -- this is what actually happened in production.
+        # Playwright requires a persistent-context launch (not a plain
+        # `launch(args=["--user-data-dir=..."])`) to set this.
+        context = p.chromium.launch_persistent_context(
+            user_data_dir,
             args=[
                 "--headless",
                 "--enable-features=NetworkService,NetworkServiceInProcess",
@@ -177,9 +192,9 @@ def fetch_availability(target_dates: list[date]) -> dict:
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--single-process",
-            ]
+            ],
         )
-        page = browser.new_page()
+        page = context.new_page()
         try:
             navigate_to_availability_page(page, target_dates)
             result = extract_date_tables(page)
@@ -195,4 +210,4 @@ def fetch_availability(target_dates: list[date]) -> dict:
                 print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
             raise
         finally:
-            browser.close()
+            context.close()
