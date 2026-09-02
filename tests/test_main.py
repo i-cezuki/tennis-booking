@@ -194,12 +194,58 @@ def test_main_resolves_webhook_url_from_ssm_when_param_set(tmp_path, monkeypatch
 
 
 def test_lambda_handler_calls_main_and_returns_status_ok(monkeypatch):
+    monkeypatch.setattr(main_module, "_invocation_count", 0)
     called = []
     monkeypatch.setattr(main_module, "main", lambda: called.append(True))
 
     result = main_module.lambda_handler({}, None)
 
     assert called == [True]
+    assert result == {"statusCode": 200}
+
+
+def test_should_recycle_false_below_limit():
+    assert main_module._should_recycle(count=14, limit=15) is False
+
+
+def test_should_recycle_true_at_limit():
+    assert main_module._should_recycle(count=15, limit=15) is True
+
+
+def test_lambda_handler_recycles_instead_of_running_main_at_limit(monkeypatch):
+    # Warm Lambda containers reused for hours have been observed to
+    # accumulate a Chromium/process-table resource leak that eventually
+    # makes every subsequent browser launch fail (see incident history).
+    # Rather than rely on AWS's own unpredictable environment-recycling
+    # timing (observed taking 1-1.7 hours to kick in once things start
+    # failing), the handler proactively kills its own process after a
+    # bounded number of invocations so the next invocation is guaranteed a
+    # fresh, unleaked environment.
+    monkeypatch.setattr(main_module, "_invocation_count", 14)
+    monkeypatch.setattr(main_module, "_INVOCATION_LIMIT_BEFORE_RECYCLE", 15)
+    main_called = []
+    monkeypatch.setattr(main_module, "main", lambda: main_called.append(True))
+    exit_calls = []
+    monkeypatch.setattr(main_module.os, "_exit", lambda code: exit_calls.append(code))
+
+    main_module.lambda_handler({}, None)
+
+    assert exit_calls == [1]
+    assert main_called == []
+
+
+def test_lambda_handler_runs_main_normally_below_recycle_limit(monkeypatch):
+    monkeypatch.setattr(main_module, "_invocation_count", 5)
+    monkeypatch.setattr(main_module, "_INVOCATION_LIMIT_BEFORE_RECYCLE", 15)
+    main_called = []
+    monkeypatch.setattr(main_module, "main", lambda: main_called.append(True))
+    exit_calls = []
+    monkeypatch.setattr(main_module.os, "_exit", lambda code: exit_calls.append(code))
+
+    result = main_module.lambda_handler({}, None)
+
+    assert exit_calls == []
+    assert main_called == [True]
     assert result == {"statusCode": 200}
 
 

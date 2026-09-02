@@ -1,4 +1,5 @@
 import os
+import sys
 
 import boto3
 
@@ -81,7 +82,37 @@ def main() -> None:
     _save_state(new_state)
 
 
+# Warm Lambda containers reused for many hours have repeatedly been
+# observed to accumulate a Chromium/process-table resource leak (zombie
+# processes, and possibly more) that eventually makes every subsequent
+# browser launch fail. AWS's own recycling of a degraded environment has
+# been observed taking 1-1.7 hours once that starts, so this proactively
+# kills the process every N invocations to force a guaranteed-fresh
+# environment well before the leak has been observed to become fatal.
+_INVOCATION_LIMIT_BEFORE_RECYCLE = int(
+    os.environ.get("INVOCATION_LIMIT_BEFORE_RECYCLE", "15")
+)
+_invocation_count = 0
+
+
+def _should_recycle(count: int, limit: int) -> bool:
+    return count >= limit
+
+
 def lambda_handler(event, context):
+    global _invocation_count
+    _invocation_count += 1
+    if _should_recycle(_invocation_count, _INVOCATION_LIMIT_BEFORE_RECYCLE):
+        print(
+            f"[info] recycling execution environment after {_invocation_count} "
+            "invocations to bound suspected warm-container resource leaks"
+        )
+        # os._exit() skips Python's normal interpreter shutdown, so the
+        # print() above would otherwise be lost if stdout is block-buffered
+        # (the case whenever it's not a TTY, e.g. under the Lambda runtime).
+        sys.stdout.flush()
+        os._exit(1)
+        return  # pragma: no cover -- unreachable outside of tests that stub os._exit
     main()
     return {"statusCode": 200}
 
