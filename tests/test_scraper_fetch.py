@@ -1,9 +1,10 @@
 import os
+import socket
 import tempfile
 from datetime import date
 
 from src import scraper
-from src.scraper import fetch_availability
+from src.scraper import fetch_availability, log_raw_tcp_connectivity
 
 
 def test_fetch_availability_uses_unique_chromium_home_and_cleans_up(monkeypatch):
@@ -39,3 +40,37 @@ def test_fetch_availability_uses_unique_chromium_home_and_cleans_up(monkeypatch)
     # persists into the next invocation on the same container.
     for created_dir in created_dirs:
         assert not os.path.exists(created_dir)
+
+
+def test_log_raw_tcp_connectivity_reports_success(monkeypatch, capsys):
+    # Distinguishes a Chromium-specific failure from a Lambda-network-level
+    # one: on a real connection failure we want to know whether a plain
+    # socket can reach the target host at all, independent of Chromium.
+    class FakeSocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(socket, "create_connection", lambda addr, timeout: FakeSocket())
+
+    log_raw_tcp_connectivity("example.com", 443)
+
+    err = capsys.readouterr().err
+    assert "example.com:443" in err
+    assert "succeeded" in err
+
+
+def test_log_raw_tcp_connectivity_reports_failure(monkeypatch, capsys):
+    def raise_timeout(addr, timeout):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(socket, "create_connection", raise_timeout)
+
+    log_raw_tcp_connectivity("example.com", 443)
+
+    err = capsys.readouterr().err
+    assert "example.com:443" in err
+    assert "failed" in err
+    assert "TimeoutError" in err

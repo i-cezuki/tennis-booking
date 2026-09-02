@@ -1,3 +1,5 @@
+import socket
+import sys
 import tempfile
 import unicodedata
 from datetime import date
@@ -156,6 +158,23 @@ def validate_extraction_result(result: dict, target_dates: list[date]) -> None:
         )
 
 
+def log_raw_tcp_connectivity(host: str, port: int) -> None:
+    """Best-effort diagnostic: can a plain TCP socket reach `host:port`
+    right now, independent of Chromium? Distinguishes a Chromium/browser
+    -specific failure from a Lambda-network-level (or site-blocking) one.
+    """
+    try:
+        with socket.create_connection((host, port), timeout=10):
+            pass
+        print(f"[debug] raw TCP connect to {host}:{port} succeeded", file=sys.stderr)
+    except Exception as e:
+        print(
+            f"[debug] raw TCP connect to {host}:{port} failed: "
+            f"{type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+
+
 def fetch_availability(target_dates: list[date]) -> dict:
     """Launch headless Chromium, navigate, extract, and return the combined
     availability snapshot for `target_dates`.
@@ -207,13 +226,13 @@ def fetch_availability(target_dates: list[date]) -> dict:
             validate_extraction_result(result, target_dates)
             return result
         except Exception:
-            import sys
             print(f"[error] fetch_availability failed at page.url = {page.url}", file=sys.stderr)
             try:
                 page.screenshot(path="failure.png", full_page=True)
                 print("[debug] saved screenshot to failure.png", file=sys.stderr)
             except Exception as screenshot_error:
                 print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
+            log_raw_tcp_connectivity("resv.city.meguro.tokyo.jp", 443)
             raise
         finally:
             browser.close()
