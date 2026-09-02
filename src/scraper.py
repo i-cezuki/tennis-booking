@@ -165,31 +165,38 @@ def fetch_availability(target_dates: list[date]) -> dict:
     with sync_playwright() as p, tempfile.TemporaryDirectory(
         prefix="chromium-home-"
     ) as chromium_home:
-        # --single-process used to be set here to work around an old "GPU
-        # process isn't usable. Goodbye." crash in Lambda. It turned out to
-        # be the source of two separate production incidents instead: (1)
-        # combined with launch_persistent_context, it crashes the browser
-        # almost immediately after start; (2) in plain launch() it runs
-        # fine for hours on a warm container and then starts failing every
-        # launch with "Failed to create a ProcessSingleton" / "Failed to
-        # create socket directory" -- even with a fresh, uniquely-named
-        # --user-data-dir each time, ruling out profile-dir reuse as the
-        # cause. --single-process forces browser+renderer+GPU+network into
-        # one OS process, which is a legacy, known-fragile mode; regular
-        # multi-process headless Chromium (--disable-gpu is enough on its
-        # own) has run stably in local testing with no GPU crash, so it's
-        # used here instead of chasing single-process further.
+        # AWS Lambda does not officially support Chromium's normal
+        # multi-process model; this is the documented working flag set for
+        # running Chromium inside Lambda (see microsoft/playwright#14023 and
+        # https://blog.carlosnunez.me/post/scraping-chromium-lambda-nodeless-zerostress/).
+        # --single-process is the flag that actually fixes the "GPU process
+        # isn't usable. Goodbye." crash; --enable-features=...InProcess keeps
+        # the network service in the same process too.
         #
-        # HOME still points at a fresh directory per launch as
-        # defense-in-depth: Lambda reuses "warm" execution environments
-        # (with /tmp persisting across invocations within one), so without
-        # this every launch would share Chromium's default profile dir.
+        # HOME must point at a fresh directory per launch: Chromium derives
+        # its default profile dir from it, and Lambda reuses "warm"
+        # execution environments (with /tmp persisting across invocations
+        # within one), so without this every launch shares the same
+        # default profile dir. If one run's Chromium doesn't exit cleanly
+        # it leaves a stale SingletonLock there, and every later invocation
+        # reusing that same container then fails with "Failed to create a
+        # ProcessSingleton" / "Failed to create socket directory" -- this
+        # is what actually happened in production.
+        #
+        # This intentionally stays on a plain launch() rather than
+        # launch_persistent_context(): combined with --single-process,
+        # launch_persistent_context crashes the browser almost immediately
+        # after start (reproduced locally -- every navigation then fails
+        # with the context already closed), so --user-data-dir is set
+        # indirectly via HOME instead.
         browser = p.chromium.launch(
             args=[
                 "--headless",
+                "--enable-features=NetworkService,NetworkServiceInProcess",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
+                "--single-process",
             ],
             env={"HOME": chromium_home},
         )
