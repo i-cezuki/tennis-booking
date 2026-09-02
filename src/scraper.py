@@ -163,8 +163,8 @@ def fetch_availability(target_dates: list[date]) -> dict:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p, tempfile.TemporaryDirectory(
-        prefix="chromium-profile-"
-    ) as user_data_dir:
+        prefix="chromium-home-"
+    ) as chromium_home:
         # AWS Lambda does not officially support Chromium's normal
         # multi-process model; this is the documented working flag set for
         # running Chromium inside Lambda (see microsoft/playwright#14023 and
@@ -173,18 +173,23 @@ def fetch_availability(target_dates: list[date]) -> dict:
         # isn't usable. Goodbye." crash; --enable-features=...InProcess keeps
         # the network service in the same process too.
         #
-        # user_data_dir must be a fresh directory per launch: Lambda reuses
-        # "warm" execution environments (and /tmp persists across
-        # invocations within one), so without this every launch shares
-        # Chromium's default profile dir. If one run's Chromium doesn't
-        # exit cleanly it leaves a stale SingletonLock there, and every
-        # later invocation reusing that same container then fails with
-        # "Failed to create a ProcessSingleton" / "Failed to create socket
-        # directory" -- this is what actually happened in production.
-        # Playwright requires a persistent-context launch (not a plain
-        # `launch(args=["--user-data-dir=..."])`) to set this.
-        context = p.chromium.launch_persistent_context(
-            user_data_dir,
+        # HOME must point at a fresh directory per launch: Chromium derives
+        # its default profile dir from it, and Lambda reuses "warm"
+        # execution environments (with /tmp persisting across invocations
+        # within one), so without this every launch shares the same
+        # default profile dir. If one run's Chromium doesn't exit cleanly
+        # it leaves a stale SingletonLock there, and every later invocation
+        # reusing that same container then fails with "Failed to create a
+        # ProcessSingleton" / "Failed to create socket directory" -- this
+        # is what actually happened in production.
+        #
+        # This intentionally stays on a plain launch() rather than
+        # launch_persistent_context(): combined with --single-process,
+        # launch_persistent_context crashes the browser almost immediately
+        # after start (reproduced locally -- every navigation then fails
+        # with the context already closed), so --user-data-dir is set
+        # indirectly via HOME instead.
+        browser = p.chromium.launch(
             args=[
                 "--headless",
                 "--enable-features=NetworkService,NetworkServiceInProcess",
@@ -193,8 +198,9 @@ def fetch_availability(target_dates: list[date]) -> dict:
                 "--disable-gpu",
                 "--single-process",
             ],
+            env={"HOME": chromium_home},
         )
-        page = context.new_page()
+        page = browser.new_page()
         try:
             navigate_to_availability_page(page, target_dates)
             result = extract_date_tables(page)
@@ -210,4 +216,4 @@ def fetch_availability(target_dates: list[date]) -> dict:
                 print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
             raise
         finally:
-            context.close()
+            browser.close()
