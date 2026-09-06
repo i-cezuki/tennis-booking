@@ -2,6 +2,7 @@ import os
 import socket
 import tempfile
 from datetime import date
+from pathlib import Path
 
 from src import scraper
 from src.scraper import fetch_availability, log_raw_tcp_connectivity
@@ -40,6 +41,38 @@ def test_fetch_availability_uses_unique_chromium_home_and_cleans_up(monkeypatch)
     # persists into the next invocation on the same container.
     for created_dir in created_dirs:
         assert not os.path.exists(created_dir)
+
+
+def test_fetch_availability_cleans_up_orphaned_chromium_home_from_prior_crash(monkeypatch):
+    # A previous invocation that got SIGKILLed (e.g. hit the Lambda function
+    # timeout) never reaches its own `with tempfile.TemporaryDirectory()`
+    # cleanup, orphaning that directory in /tmp. Left unchecked these
+    # accumulate across many invocations on the same warm container until
+    # the small ephemeral disk fills up entirely and every subsequent
+    # Chromium launch fails (surfaced misleadingly as "Failed to create a
+    # ProcessSingleton" / socket-directory errors -- confirmed in production
+    # logs showing the real cause: "No space left on device").
+    monkeypatch.setattr(scraper, "navigate_to_availability_page", lambda page, dates: None)
+    monkeypatch.setattr(scraper, "extract_date_tables", lambda page: {"2026-08-22": {}})
+    monkeypatch.setattr(scraper, "validate_extraction_result", lambda result, dates: None)
+
+    orphan_dirs = [
+        tempfile.mkdtemp(prefix=prefix)
+        for prefix in (
+            "chromium-home-",
+            "playwright-artifacts-",
+            "playwright_chromiumdev_profile-",
+            ".org.chromium.Chromium.",
+        )
+    ]
+    for orphan_dir in orphan_dirs:
+        (Path(orphan_dir) / "leftover-profile-data").write_bytes(b"x" * 1024)
+        assert os.path.exists(orphan_dir)
+
+    fetch_availability([date(2026, 8, 22)])
+
+    for orphan_dir in orphan_dirs:
+        assert not os.path.exists(orphan_dir)
 
 
 def test_log_raw_tcp_connectivity_reports_success(monkeypatch, capsys):

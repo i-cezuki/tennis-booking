@@ -1,3 +1,5 @@
+import os
+import shutil
 import socket
 import sys
 import tempfile
@@ -175,11 +177,44 @@ def log_raw_tcp_connectivity(host: str, port: int) -> None:
         )
 
 
+# Every temp-dir prefix Chromium/Playwright create per launch when no
+# explicit user_data_dir is given: our own HOME override dir, Playwright's
+# own artifacts and Chromium-profile dirs, and Chromium's own singleton
+# -socket directory. Confirmed via `ps`/`ls /tmp` inspection of a real
+# launch+close cycle. All of these are normally removed on a clean
+# browser.close(), but none of that cleanup runs if the process is
+# SIGKILLed instead (e.g. hitting the Lambda function timeout).
+_ORPHANABLE_TMP_PREFIXES = (
+    "chromium-home-",
+    "playwright-artifacts-",
+    "playwright_chromiumdev_profile-",
+    ".org.chromium.Chromium.",
+)
+
+
+def _cleanup_orphaned_chromium_homes() -> None:
+    """Remove leftovers from a previous invocation that got killed (e.g.
+    hit the Lambda function timeout) before its own cleanup could run.
+    Left unchecked these accumulate across many invocations on the same
+    warm Lambda container until the small ephemeral /tmp disk fills up
+    entirely, and every subsequent Chromium launch then fails -- surfaced
+    misleadingly as "Failed to create a ProcessSingleton" / socket
+    -directory errors, with the real "No space left on device" cause
+    buried lower in Chromium's own stderr spam.
+    """
+    base = tempfile.gettempdir()
+    for name in os.listdir(base):
+        if name.startswith(_ORPHANABLE_TMP_PREFIXES):
+            shutil.rmtree(os.path.join(base, name), ignore_errors=True)
+
+
 def fetch_availability(target_dates: list[date]) -> dict:
     """Launch headless Chromium, navigate, extract, and return the combined
     availability snapshot for `target_dates`.
     """
     from playwright.sync_api import sync_playwright
+
+    _cleanup_orphaned_chromium_homes()
 
     with sync_playwright() as p, tempfile.TemporaryDirectory(
         prefix="chromium-home-"
