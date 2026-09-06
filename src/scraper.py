@@ -268,6 +268,13 @@ def fetch_availability(target_dates: list[date]) -> dict:
             except Exception as screenshot_error:
                 print(f"[debug] screenshot failed: {screenshot_error}", file=sys.stderr)
             log_raw_tcp_connectivity("resv.city.meguro.tokyo.jp", 443)
+            # Control check: is this host specifically unreachable, or is
+            # ALL outbound network access from this execution environment
+            # broken? A well-known, highly available host succeeding while
+            # the target site fails points at the site (or something in
+            # front of it) blocking this Lambda specifically; both failing
+            # points at a Lambda/AWS-networking-level problem instead.
+            log_raw_tcp_connectivity("www.google.com", 443)
             raise
         finally:
             browser.close()
