@@ -9,7 +9,12 @@ resource "aws_lambda_function" "watcher" {
   package_type  = "Image"
   image_uri     = "${aws_ecr_repository.watcher.repository_url}:latest"
   timeout       = 60
-  memory_size   = 2048
+  # Bumped from 2048 to test whether the persistent "Failed to create a
+  # ProcessSingleton" / socket-directory Chromium launch failures (occurring
+  # even on freshly recycled execution environments, so not explained by
+  # warm-container leak accumulation alone) are a symptom of CPU/resource
+  # contention -- Lambda allocates CPU proportional to memory_size.
+  memory_size = 4096
 
   ephemeral_storage {
     size = 1024
@@ -18,9 +23,9 @@ resource "aws_lambda_function" "watcher" {
   environment {
     variables = {
       STATE_BACKEND             = "s3"
-      STATE_BUCKET               = aws_s3_bucket.state.bucket
-      STATE_KEY                  = "state.json"
-      DISCORD_WEBHOOK_SSM_PARAM  = aws_ssm_parameter.discord_webhook_url.name
+      STATE_BUCKET              = aws_s3_bucket.state.bucket
+      STATE_KEY                 = "state.json"
+      DISCORD_WEBHOOK_SSM_PARAM = aws_ssm_parameter.discord_webhook_url.name
     }
   }
 
