@@ -71,7 +71,12 @@ resource "aws_scheduler_schedule" "watcher" {
     mode = "OFF"
   }
 
-  schedule_expression = "rate(${var.schedule_rate_minutes} minutes)"
+  # Restricted to 8:00-22:55 JST (court booking system's active hours,
+  # roughly) to cut daily request volume against the target site, on the
+  # chance the persistent Chromium/connectivity failures are related to
+  # rate limiting rather than purely Lambda-side resource issues.
+  schedule_expression          = "cron(0/${var.schedule_rate_minutes} 8-22 * * ? *)"
+  schedule_expression_timezone = "Asia/Tokyo"
 
   target {
     arn      = aws_lambda_function.watcher.arn
