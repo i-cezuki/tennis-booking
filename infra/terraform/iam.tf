@@ -13,6 +13,16 @@ resource "aws_iam_role" "lambda_exec" {
   })
 }
 
+# Lets Lambda create/manage the ENIs it needs to run inside a VPC (e.g. to
+# egress through a NAT Gateway with a dedicated Elastic IP, so the
+# function's outbound traffic isn't drawn from Lambda's shared/dynamic IP
+# pool -- suspected of getting the target site's connections dropped for
+# some fraction of invocations regardless of what Chromium/local fixes do).
+resource "aws_iam_role_policy_attachment" "lambda_exec_vpc_access" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
 resource "aws_iam_role_policy" "lambda_exec" {
   name = "${var.project_name}-lambda-exec"
   role = aws_iam_role.lambda_exec.id
