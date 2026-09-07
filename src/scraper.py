@@ -164,15 +164,30 @@ def log_raw_tcp_connectivity(host: str, port: int) -> None:
     """Best-effort diagnostic: can a plain TCP socket reach `host:port`
     right now, independent of Chromium? Distinguishes a Chromium/browser
     -specific failure from a Lambda-network-level (or site-blocking) one.
+    Also logs the resolved IP(s): failures have so far always been
+    correlated with which warm execution environment is handling the
+    invocation (consistently failing across retries on one, then
+    succeeding right after a fresh one), even after pinning Lambda's
+    egress to a single static IP -- resolving to a different backend IP
+    per environment (DNS round-robin + per-process resolver caching)
+    would explain that pattern just as well as source-IP blocking would.
     """
+    try:
+        resolved = sorted({addr[4][0] for addr in socket.getaddrinfo(host, port)})
+    except Exception as e:
+        resolved = [f"<resolution failed: {type(e).__name__}: {e}>"]
     try:
         with socket.create_connection((host, port), timeout=10):
             pass
-        print(f"[debug] raw TCP connect to {host}:{port} succeeded", file=sys.stderr)
+        print(
+            f"[debug] raw TCP connect to {host}:{port} succeeded "
+            f"(resolved: {resolved})",
+            file=sys.stderr,
+        )
     except Exception as e:
         print(
-            f"[debug] raw TCP connect to {host}:{port} failed: "
-            f"{type(e).__name__}: {e}",
+            f"[debug] raw TCP connect to {host}:{port} failed "
+            f"(resolved: {resolved}): {type(e).__name__}: {e}",
             file=sys.stderr,
         )
 

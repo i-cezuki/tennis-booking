@@ -87,12 +87,17 @@ def test_log_raw_tcp_connectivity_reports_success(monkeypatch, capsys):
             return False
 
     monkeypatch.setattr(socket, "create_connection", lambda addr, timeout: FakeSocket())
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda host, port: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port))],
+    )
 
     log_raw_tcp_connectivity("example.com", 443)
 
     err = capsys.readouterr().err
     assert "example.com:443" in err
     assert "succeeded" in err
+    assert "93.184.216.34" in err
 
 
 def test_log_raw_tcp_connectivity_reports_failure(monkeypatch, capsys):
@@ -100,6 +105,10 @@ def test_log_raw_tcp_connectivity_reports_failure(monkeypatch, capsys):
         raise TimeoutError("timed out")
 
     monkeypatch.setattr(socket, "create_connection", raise_timeout)
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda host, port: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port))],
+    )
 
     log_raw_tcp_connectivity("example.com", 443)
 
@@ -107,3 +116,21 @@ def test_log_raw_tcp_connectivity_reports_failure(monkeypatch, capsys):
     assert "example.com:443" in err
     assert "failed" in err
     assert "TimeoutError" in err
+    assert "93.184.216.34" in err
+
+
+def test_log_raw_tcp_connectivity_handles_resolution_failure(monkeypatch, capsys):
+    # DNS round-robin plus per-container resolver caching could make the
+    # target site resolve to a different backend IP per warm environment;
+    # a resolution failure itself must not crash the diagnostic.
+    def raise_resolution_error(host, port):
+        raise socket.gaierror("Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", raise_resolution_error)
+    monkeypatch.setattr(socket, "create_connection", lambda addr, timeout: (_ for _ in ()).throw(TimeoutError()))
+
+    log_raw_tcp_connectivity("example.com", 443)
+
+    err = capsys.readouterr().err
+    assert "resolution failed" in err
+    assert "gaierror" in err
