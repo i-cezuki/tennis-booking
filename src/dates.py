@@ -1,6 +1,8 @@
 import re
 from datetime import date, datetime, timedelta, timezone
 
+import jpholiday
+
 _JP_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日")
 # Fixed UTC+9 offset rather than zoneinfo.ZoneInfo("Asia/Tokyo"): Japan
 # observes no DST so the offset never changes, and the Lambda base image
@@ -26,6 +28,24 @@ def weekend_dates_in_range(start: date, num_days: int) -> list[date]:
     for offset in range(num_days):
         current = start + timedelta(days=offset)
         if current.weekday() in (5, 6):  # Saturday=5, Sunday=6
+            result.append(current)
+    return result
+
+
+def weekend_and_holiday_dates_in_range(start: date, num_days: int) -> list[date]:
+    """Return every Saturday/Sunday/Japanese national holiday in
+    [start, start + num_days), sorted ascending, with no duplicates for a
+    holiday that also falls on a weekend.
+
+    Court demand on national holidays tracks weekend demand, not weekday
+    demand, so weekend_dates_in_range alone would silently never check
+    availability for a holiday landing on a weekday (e.g. 敬老の日, which
+    is always a Monday).
+    """
+    result = []
+    for offset in range(num_days):
+        current = start + timedelta(days=offset)
+        if current.weekday() in (5, 6) or jpholiday.is_holiday(current):
             result.append(current)
     return result
 

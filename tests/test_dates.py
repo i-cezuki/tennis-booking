@@ -1,6 +1,11 @@
 from datetime import date, datetime, timezone
 from src import dates as dates_module
-from src.dates import weekend_dates_in_range, parse_japanese_date, today_jst
+from src.dates import (
+    weekend_dates_in_range,
+    weekend_and_holiday_dates_in_range,
+    parse_japanese_date,
+    today_jst,
+)
 
 
 def test_weekend_dates_in_range_includes_only_sat_sun():
@@ -37,6 +42,54 @@ def test_weekend_dates_in_range_exact_expected_set():
         date(2026, 8, 23),  # Sun
         date(2026, 8, 29),  # Sat
     ]
+
+
+def test_weekend_and_holiday_dates_in_range_includes_weekday_holiday():
+    # 2026-09-21 (Mon) is 敬老の日, a national holiday falling on a weekday --
+    # weekend_dates_in_range alone would miss it entirely, silently never
+    # checking court availability for it.
+    start = date(2026, 9, 18)  # Fri
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert date(2026, 9, 21) in result
+
+
+def test_weekend_and_holiday_dates_in_range_includes_consecutive_weekday_holidays():
+    # 2026-09-21/22/23 (Mon/Tue/Wed) are 敬老の日, 国民の休日, 秋分の日 --
+    # three consecutive weekday holidays via the "citizens' holiday" bridge
+    # rule, none of which are Saturday/Sunday.
+    start = date(2026, 9, 18)
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert date(2026, 9, 21) in result
+    assert date(2026, 9, 22) in result
+    assert date(2026, 9, 23) in result
+
+
+def test_weekend_and_holiday_dates_in_range_still_includes_weekends():
+    start = date(2026, 8, 16)  # Sunday
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert date(2026, 8, 16) in result
+    assert date(2026, 8, 22) in result
+
+
+def test_weekend_and_holiday_dates_in_range_excludes_ordinary_weekdays():
+    # 2026-09-24 (Thu) is an ordinary weekday, not a holiday.
+    start = date(2026, 9, 18)
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert date(2026, 9, 24) not in result
+
+
+def test_weekend_and_holiday_dates_in_range_no_duplicate_when_holiday_is_weekend():
+    # A holiday that also happens to fall on a Saturday/Sunday must not be
+    # double-counted: 2026-05-03 (憲法記念日) is a Sunday.
+    start = date(2026, 4, 27)
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert result.count(date(2026, 5, 3)) == 1
+
+
+def test_weekend_and_holiday_dates_in_range_sorted_ascending():
+    start = date(2026, 9, 18)
+    result = weekend_and_holiday_dates_in_range(start, 14)
+    assert result == sorted(result)
 
 
 def test_parse_japanese_date_basic():

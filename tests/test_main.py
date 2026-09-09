@@ -10,7 +10,7 @@ def test_main_sends_notification_when_new_opening(tmp_path, monkeypatch):
     monkeypatch.setenv("STATE_PATH", str(state_path))
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
     monkeypatch.setattr(
-        main_module, "weekend_dates_in_range",
+        main_module, "weekend_and_holiday_dates_in_range",
         lambda start, num_days: [date(2026, 8, 22)],
     )
     monkeypatch.setattr(
@@ -40,7 +40,7 @@ def test_main_does_not_notify_when_no_new_opening(tmp_path, monkeypatch):
     monkeypatch.setenv("STATE_PATH", str(state_path))
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
     monkeypatch.setattr(
-        main_module, "weekend_dates_in_range",
+        main_module, "weekend_and_holiday_dates_in_range",
         lambda start, num_days: [date(2026, 8, 22)],
     )
     monkeypatch.setattr(
@@ -72,7 +72,7 @@ def test_main_logs_fetch_summary(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("STATE_PATH", str(state_path))
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
     monkeypatch.setattr(
-        main_module, "weekend_dates_in_range",
+        main_module, "weekend_and_holiday_dates_in_range",
         lambda start, num_days: [date(2026, 8, 22)],
     )
     monkeypatch.setattr(
@@ -97,7 +97,7 @@ def test_main_logs_state_changed_when_no_new_opening(tmp_path, monkeypatch, caps
     monkeypatch.setenv("STATE_PATH", str(state_path))
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
     monkeypatch.setattr(
-        main_module, "weekend_dates_in_range",
+        main_module, "weekend_and_holiday_dates_in_range",
         lambda start, num_days: [date(2026, 8, 22)],
     )
     monkeypatch.setattr(
@@ -134,7 +134,7 @@ def test_main_uses_s3_state_backend_when_configured(monkeypatch):
         monkeypatch.setenv("STATE_KEY", "state.json")
         monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
         monkeypatch.setattr(
-            main_module, "weekend_dates_in_range",
+            main_module, "weekend_and_holiday_dates_in_range",
             lambda start, num_days: [date(2026, 8, 22)],
         )
         monkeypatch.setattr(
@@ -175,7 +175,7 @@ def test_main_resolves_webhook_url_from_ssm_when_param_set(tmp_path, monkeypatch
         monkeypatch.setenv("DISCORD_WEBHOOK_SSM_PARAM", "/watcher/discord_webhook_url")
         monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
         monkeypatch.setattr(
-            main_module, "weekend_dates_in_range",
+            main_module, "weekend_and_holiday_dates_in_range",
             lambda start, num_days: [date(2026, 8, 22)],
         )
         monkeypatch.setattr(
@@ -268,7 +268,7 @@ def test_main_uploads_failure_screenshot_to_s3_when_scrape_raises(tmp_path, monk
         monkeypatch.setenv("STATE_BUCKET", "test-bucket")
         monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
         monkeypatch.setattr(
-            main_module, "weekend_dates_in_range",
+            main_module, "weekend_and_holiday_dates_in_range",
             lambda start, num_days: [date(2026, 8, 22)],
         )
 
@@ -306,7 +306,7 @@ def test_main_does_not_upload_when_no_failure_screenshot_exists(tmp_path, monkey
         monkeypatch.setenv("STATE_BUCKET", "test-bucket")
         monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.example/webhook")
         monkeypatch.setattr(
-            main_module, "weekend_dates_in_range",
+            main_module, "weekend_and_holiday_dates_in_range",
             lambda start, num_days: [date(2026, 8, 22)],
         )
         monkeypatch.setattr(
