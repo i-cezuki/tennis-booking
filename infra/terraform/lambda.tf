@@ -71,11 +71,10 @@ resource "aws_scheduler_schedule" "watcher" {
     mode = "OFF"
   }
 
-  # Restricted to 8:00-22:55 JST (court booking system's active hours,
-  # roughly) to cut daily request volume against the target site, on the
-  # chance the persistent Chromium/connectivity failures are related to
-  # rate limiting rather than purely Lambda-side resource issues.
-  schedule_expression          = "cron(0/${var.schedule_rate_minutes} 8-22 * * ? *)"
+  # Restricted to 7:00-23:55 JST (court booking system's active hours,
+  # roughly). Widened from the initial 8:00-22:55 window once monitoring
+  # ran error-free after the VPC/EIP networking and disk-cleanup fixes.
+  schedule_expression          = "cron(0/${var.schedule_rate_minutes} 7-23 * * ? *)"
   schedule_expression_timezone = "Asia/Tokyo"
 
   target {
