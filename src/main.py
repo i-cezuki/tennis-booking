@@ -141,18 +141,24 @@ def _log_memory_diagnostics() -> None:
             procs = []
         tmp_bytes = 0
         tmp_entries = 0
+        tmp_top = {}  # top-level /tmp entry -> total size in bytes
         for root, dirs, files in os.walk("/tmp"):
             tmp_entries += len(dirs) + len(files)
+            top = os.path.relpath(root, "/tmp").split(os.sep)[0]
             for name in files:
                 try:
-                    tmp_bytes += os.lstat(os.path.join(root, name)).st_size
+                    size = os.lstat(os.path.join(root, name)).st_size
                 except OSError:
-                    pass
+                    continue
+                tmp_bytes += size
+                key = name if top == "." else top
+                tmp_top[key] = tmp_top.get(key, 0) + size
         print(
             f"[diag] memory invocation={_invocation_count} meminfo_mb={meminfo} "
             f"cgroup_mb={cgroup} py_rss_mb={self_status.get('VmRSS')} "
             f"procs={len(procs)} {sorted(set(procs))} "
-            f"tmp_entries={tmp_entries} tmp_mb={tmp_bytes // 2**20}"
+            f"tmp_entries={tmp_entries} tmp_mb={tmp_bytes // 2**20} "
+            f"tmp_top_kb={ {k: v // 1024 for k, v in sorted(tmp_top.items())} }"
         )
     except Exception as e:  # never let a diagnostic break the invocation
         print(f"[diag] memory diagnostics failed: {type(e).__name__}: {e}")
