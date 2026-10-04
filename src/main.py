@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 
 import boto3
 
@@ -102,20 +103,31 @@ def _should_recycle(count: int, limit: int) -> bool:
 def lambda_handler(event, context):
     global _invocation_count
     _invocation_count += 1
-    if _should_recycle(_invocation_count, _INVOCATION_LIMIT_BEFORE_RECYCLE):
+    if not _should_recycle(_invocation_count, _INVOCATION_LIMIT_BEFORE_RECYCLE):
+        main()
+        return {"statusCode": 200}
+
+    # Run this invocation's check before exiting, so the recycle doesn't
+    # cost a 5-minute slot. The exit still reports Runtime.ExitError; Lambda
+    # async retries are disabled in Terraform so that error doesn't trigger
+    # a duplicate run ~1 minute later.
+    try:
+        main()
+    except Exception:
+        # os._exit() below discards the in-flight exception, so print its
+        # traceback explicitly or the failure would leave no trace in logs.
+        traceback.print_exc()
+    finally:
         print(
             f"[info] recycling execution environment after {_invocation_count} "
             "invocations to bound suspected warm-container resource leaks"
         )
-        # os._exit() skips Python's normal interpreter shutdown, so the
-        # print() above would otherwise be lost if stdout is block-buffered
-        # (the case whenever it's not a TTY, e.g. under the Lambda runtime).
+        # os._exit() skips Python's normal interpreter shutdown, so buffered
+        # output would otherwise be lost when stdout/stderr aren't a TTY
+        # (the case under the Lambda runtime).
         sys.stdout.flush()
+        sys.stderr.flush()
         os._exit(1)
-        return  # pragma: no cover -- unreachable outside of tests that stub os._exit
-    main()
-    return {"statusCode": 200}
-
 
 if __name__ == "__main__":
     main()

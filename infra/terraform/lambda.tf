@@ -32,6 +32,17 @@ resource "aws_lambda_function" "watcher" {
   depends_on = [aws_cloudwatch_log_group.watcher]
 }
 
+# The handler deliberately os._exit()s every N invocations to recycle its
+# execution environment (see src/main.py), which Lambda reports as
+# Runtime.ExitError. With the default 2 async retries that re-ran the same
+# request ~1 minute later, breaking the 5-minute cadence. Disabled so each
+# scheduled slot runs exactly once; a genuinely failed check is simply
+# picked up by the next slot 5 minutes later.
+resource "aws_lambda_function_event_invoke_config" "watcher" {
+  function_name          = aws_lambda_function.watcher.function_name
+  maximum_retry_attempts = 0
+}
+
 resource "aws_iam_role" "scheduler_invoke" {
   name = "${var.project_name}-scheduler-invoke"
 

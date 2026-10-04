@@ -212,7 +212,7 @@ def test_should_recycle_true_at_limit():
     assert main_module._should_recycle(count=15, limit=15) is True
 
 
-def test_lambda_handler_recycles_instead_of_running_main_at_limit(monkeypatch):
+def test_lambda_handler_runs_main_then_recycles_at_limit(monkeypatch):
     # Warm Lambda containers reused for hours have been observed to
     # accumulate a Chromium/process-table resource leak that eventually
     # makes every subsequent browser launch fail (see incident history).
@@ -220,18 +220,37 @@ def test_lambda_handler_recycles_instead_of_running_main_at_limit(monkeypatch):
     # timing (observed taking 1-1.7 hours to kick in once things start
     # failing), the handler proactively kills its own process after a
     # bounded number of invocations so the next invocation is guaranteed a
-    # fresh, unleaked environment.
+    # fresh, unleaked environment. It still does this invocation's check
+    # first, so the recycling invocation's 5-minute slot is not skipped
+    # (with async retries disabled, nothing re-runs it later).
     monkeypatch.setattr(main_module, "_invocation_count", 14)
     monkeypatch.setattr(main_module, "_INVOCATION_LIMIT_BEFORE_RECYCLE", 15)
-    main_called = []
-    monkeypatch.setattr(main_module, "main", lambda: main_called.append(True))
+    calls = []
+    monkeypatch.setattr(main_module, "main", lambda: calls.append("main"))
+    monkeypatch.setattr(main_module.os, "_exit", lambda code: calls.append(("exit", code)))
+
+    main_module.lambda_handler({}, None)
+
+    assert calls == ["main", ("exit", 1)]
+
+
+def test_lambda_handler_still_recycles_at_limit_when_main_raises(monkeypatch, capsys):
+    monkeypatch.setattr(main_module, "_invocation_count", 14)
+    monkeypatch.setattr(main_module, "_INVOCATION_LIMIT_BEFORE_RECYCLE", 15)
+
+    def failing_main():
+        raise RuntimeError("scrape failed")
+
+    monkeypatch.setattr(main_module, "main", failing_main)
     exit_calls = []
     monkeypatch.setattr(main_module.os, "_exit", lambda code: exit_calls.append(code))
 
     main_module.lambda_handler({}, None)
 
     assert exit_calls == [1]
-    assert main_called == []
+    # os._exit() discards the in-flight exception, so its traceback must be
+    # printed explicitly or the failure would leave no trace in the logs.
+    assert "RuntimeError: scrape failed" in capsys.readouterr().err
 
 
 def test_lambda_handler_runs_main_normally_below_recycle_limit(monkeypatch):
