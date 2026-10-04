@@ -340,3 +340,31 @@ def test_main_does_not_upload_when_no_failure_screenshot_exists(tmp_path, monkey
 
         listed = s3.list_objects_v2(Bucket="test-bucket", Prefix="failures/")
         assert listed.get("KeyCount", 0) == 0
+
+
+def test_log_memory_diagnostics_prints_one_line_and_never_raises(capsys):
+    # Runs on hosts without /proc or cgroup files (e.g. macOS) too: every
+    # source is best-effort, so it must still print rather than raise.
+    main_module._log_memory_diagnostics()
+
+    out = capsys.readouterr().out
+    assert out.startswith("[diag] memory ")
+    assert out.count("\n") == 1
+
+
+def test_lambda_handler_logs_memory_diagnostics_even_when_main_raises(monkeypatch):
+    monkeypatch.setattr(main_module, "_invocation_count", 0)
+
+    def failing_main():
+        raise RuntimeError("scrape failed")
+
+    monkeypatch.setattr(main_module, "main", failing_main)
+    diag_calls = []
+    monkeypatch.setattr(main_module, "_log_memory_diagnostics", lambda: diag_calls.append(True))
+
+    try:
+        main_module.lambda_handler({}, None)
+    except RuntimeError:
+        pass
+
+    assert diag_calls == [True]

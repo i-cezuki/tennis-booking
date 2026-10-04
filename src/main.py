@@ -96,6 +96,68 @@ _INVOCATION_LIMIT_BEFORE_RECYCLE = int(
 _invocation_count = 0
 
 
+def _read_kv_file(path: str, keys: tuple, divisor: int) -> dict:
+    out = {}
+    try:
+        with open(path) as f:
+            for line in f:
+                parts = line.replace(":", " ").split()
+                if len(parts) >= 2 and parts[0] in keys:
+                    out[parts[0]] = int(parts[1]) // divisor
+    except OSError:
+        pass
+    return out
+
+
+def _log_memory_diagnostics() -> None:
+    """Best-effort diagnostic: one line per invocation breaking down where
+    memory goes, to tell whether the ~25MB/invocation growth in Lambda's
+    "Max Memory Used" on a warm environment is a real leak (anon memory /
+    leftover processes) or reclaimable page cache. It doesn't reproduce
+    locally in the same image, so it has to be observed in Lambda itself.
+    """
+    try:
+        meminfo = _read_kv_file(
+            "/proc/meminfo",
+            ("MemTotal", "MemAvailable", "AnonPages", "Cached", "Shmem", "Buffers"),
+            1024,
+        )
+        cgroup = {}
+        for path in ("/sys/fs/cgroup/memory.stat", "/sys/fs/cgroup/memory/memory.stat"):
+            cgroup = _read_kv_file(path, ("anon", "file", "shmem", "rss", "cache"), 2**20)
+            if cgroup:
+                break
+        self_status = _read_kv_file("/proc/self/status", ("VmRSS",), 1024)
+        try:
+            procs = []
+            for pid in os.listdir("/proc"):
+                if pid.isdigit():
+                    try:
+                        with open(f"/proc/{pid}/comm") as f:
+                            procs.append(f.read().strip())
+                    except OSError:
+                        pass
+        except OSError:
+            procs = []
+        tmp_bytes = 0
+        tmp_entries = 0
+        for root, dirs, files in os.walk("/tmp"):
+            tmp_entries += len(dirs) + len(files)
+            for name in files:
+                try:
+                    tmp_bytes += os.lstat(os.path.join(root, name)).st_size
+                except OSError:
+                    pass
+        print(
+            f"[diag] memory invocation={_invocation_count} meminfo_mb={meminfo} "
+            f"cgroup_mb={cgroup} py_rss_mb={self_status.get('VmRSS')} "
+            f"procs={len(procs)} {sorted(set(procs))} "
+            f"tmp_entries={tmp_entries} tmp_mb={tmp_bytes // 2**20}"
+        )
+    except Exception as e:  # never let a diagnostic break the invocation
+        print(f"[diag] memory diagnostics failed: {type(e).__name__}: {e}")
+
+
 def _should_recycle(count: int, limit: int) -> bool:
     return count >= limit
 
@@ -104,7 +166,10 @@ def lambda_handler(event, context):
     global _invocation_count
     _invocation_count += 1
     if not _should_recycle(_invocation_count, _INVOCATION_LIMIT_BEFORE_RECYCLE):
-        main()
+        try:
+            main()
+        finally:
+            _log_memory_diagnostics()
         return {"statusCode": 200}
 
     # Run this invocation's check before exiting, so the recycle doesn't
@@ -118,6 +183,7 @@ def lambda_handler(event, context):
         # traceback explicitly or the failure would leave no trace in logs.
         traceback.print_exc()
     finally:
+        _log_memory_diagnostics()
         print(
             f"[info] recycling execution environment after {_invocation_count} "
             "invocations to bound suspected warm-container resource leaks"
