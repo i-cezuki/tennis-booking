@@ -9,12 +9,10 @@ resource "aws_lambda_function" "watcher" {
   package_type  = "Image"
   image_uri     = "${aws_ecr_repository.watcher.repository_url}:latest"
   timeout       = 60
-  # Bumped from 2048 to test whether the persistent "Failed to create a
-  # ProcessSingleton" / socket-directory Chromium launch failures (occurring
-  # even on freshly recycled execution environments, so not explained by
-  # warm-container leak accumulation alone) are a symptom of CPU/resource
-  # contention -- Lambda allocates CPU proportional to memory_size.
-  memory_size = 4096
+  # Back to 2048 (from a 4096 experiment for Chromium ProcessSingleton
+  # launch failures) to keep the 3-minute cadence within the Lambda free
+  # tier: ~10s/run at ~900MB actually used.
+  memory_size = 2048
 
   ephemeral_storage {
     size = 1024
@@ -35,9 +33,9 @@ resource "aws_lambda_function" "watcher" {
 # The handler deliberately os._exit()s every N invocations to recycle its
 # execution environment (see src/main.py), which Lambda reports as
 # Runtime.ExitError. With the default 2 async retries that re-ran the same
-# request ~1 minute later, breaking the 5-minute cadence. Disabled so each
+# request ~1 minute later, breaking the schedule cadence. Disabled so each
 # scheduled slot runs exactly once; a genuinely failed check is simply
-# picked up by the next slot 5 minutes later.
+# picked up by the next scheduled slot.
 resource "aws_lambda_function_event_invoke_config" "watcher" {
   function_name          = aws_lambda_function.watcher.function_name
   maximum_retry_attempts = 0

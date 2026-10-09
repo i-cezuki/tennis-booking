@@ -19,5 +19,5 @@ variable "discord_webhook_url" {
 variable "schedule_rate_minutes" {
   description = "How often EventBridge Scheduler invokes the watcher Lambda"
   type        = number
-  default     = 5
+  default     = 3
 }
